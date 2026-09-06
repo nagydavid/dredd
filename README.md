@@ -1,54 +1,38 @@
-# dredd
+# stayhomedad
 
 ```
-                _________
-           _.--'         '--._
-        .-'                   '-.
-      .'                         '.
-    .'                             '.
-  .'          |           |          '.
- /            |___________|            \
-|  /\         |  .  .  .  |         /\  |
-| /  '-.      |___________|      .-'  \ |
-|/  ,.  \     |   |   |   |     /  ..  \|
-|\  \ \  '.   |   |   |   |   .'  / /  /|
-| \  \ '.  \  |   |   |   |  /  .' /  / |
-|  \  |  \  '.|   |   |   |.'  /  |  /  |
-|   | |   '.  \   |   |   /  .'   | |   |
-|   | |     \  '-.|   |.-'  /     | |   |
-|   | |      '-.  '._.'  .-'      | |   |
-|   | |         \       /         | |   |
-|   | |          \_____/          | |   |
-|   | |'.                       .'| |   |
-|   | |  '.                   .'  | |   |
-|   | |'.  '-._           _.-'  .'| |   |
-|   | |  '.    '-._____.-'    .'  | |   |
- \ /   \   '-._           _.-'   /   \ /
-  \|    \      '-._____.-'      /    |/
-   '.    \          _ _        /    .'
-     \   ||      ________     ||   /
-      '. ||     /        \    || .'
-        \//\       --  -     /\\/
-            |               |
-            |               |
-             '.___________.'
+                  .---------------------.
+                  |                     |__
+                  |     W O R L D ' S   |  \
+                  |                     |   |
+                  |    O K A Y E S T    |   |
+                  |                     |  /
+                  |       D A D         |_/
+                  |                     |
+                  '---------------------'
+                   \                   /
+                    '-----------------'
 
-              I  A M  T H E  L A W
+        .-----------------------------------------.
+        |   ()    [====]    //\\    (o)    |___|   |
+        |_________________________________________|
+                 the tools stay in here
 ```
 
-**D**oubt-**R**ated **E**scalation for **D**elegated **D**evelopment.
+*Does the job himself. Calls a professional when the pipe bursts.*
+
 
 An [OpenCode](https://opencode.ai) plugin in two halves, both aimed at the same
 thing: your frontier model should pay for conclusions, not for raw material.
 
-- **dredd** scores every local turn with a one-token judge call and escalates
+- **The judge** scores every local turn with a one-token call and escalates
   only the ones that went badly.
-- **isoblock** stops an agent on a metered model from calling repo tools at
-  all. It has to delegate to a local subagent and work from what comes back.
+- **The tool policy** stops an agent on a metered model from calling repo tools
+  at all. It has to delegate to a local subagent and work from what comes back.
 
-Either half works on its own. isoblock is off until you turn it on.
+Either half works on its own. The tool policy is off until you turn it on.
 
-## Why dredd
+## Why a judge
 
 The usual way to make a local agent escalate is to write a rule in its prompt:
 *"hand off when the task touches three or more files, or after two failed
@@ -57,7 +41,7 @@ competence, and it does not reliably comply. In the sessions that motivated
 this plugin, a local model followed a mandated status-block rule in 1 turn out
 of 48.
 
-dredd replaces that judgement with a measurement. A separate call, with no
+stayhomedad replaces that judgement with a measurement. A separate call, with no
 history and no stake in the outcome, is asked whether the turn actually handled
 the request. It may answer with exactly one token, so the answer's logprobs give
 a usable probability rather than a coin flip. That number is the gate.
@@ -65,14 +49,14 @@ a usable probability rather than a coin flip. That number is the gate.
 This is the confidence-cascade pattern: run the cheap model first, score the
 result, escalate only on low confidence.
 
-## Why isoblock
+## Why a tool policy
 
 Per-agent `permission` blocks in `opencode.json` already deny tools by agent
 name. Two things go wrong with that. You have to remember to write the block
 for every agent you add, and a frontier agent that *is* allowed to read will
 read twenty files rather than ask for the one line it needs.
 
-isoblock states the rule once, by provider: an agent whose model is not served
+stayhomedad states the rule once, by provider: an agent whose model is not served
 locally does not get `read`, `bash`, `grep`, `glob`, `edit`, `write` or
 `apply_patch`. The refusal names the subagent to delegate to, so the model
 recovers by itself on the next tool call rather than giving up. Everything else
@@ -86,13 +70,13 @@ resolved at all, nothing is blocked.
 ## Install
 
 ```bash
-npm install opencode-dredd     # or: bun add opencode-dredd
+npm install opencode-stayhomedad     # or: bun add opencode-stayhomedad
 ```
 
 ```jsonc
 // ~/.config/opencode/opencode.json
 {
-  "plugin": ["opencode-dredd"]
+  "plugin": ["opencode-stayhomedad"]
 }
 ```
 
@@ -101,12 +85,12 @@ Requires OpenCode 1.18 or newer and any OpenAI-compatible local endpoint
 
 ## Configure
 
-Inline options win over `~/.config/opencode/dredd.json`, which wins over the
+Inline options win over `~/.config/opencode/stayhomedad.json`, which wins over the
 defaults. Restart OpenCode after changing either.
 
 ```jsonc
 {
-  "plugin": [["opencode-dredd", { "mode": "auto", "threshold": 0.5 }]]
+  "plugin": [["opencode-stayhomedad", { "mode": "auto", "threshold": 0.5 }]]
 }
 ```
 
@@ -121,13 +105,13 @@ defaults. Restart OpenCode after changing either.
 | `judgeModel` | `null` | Pin a judge model, e.g. a small fast one. |
 | `providerUrls` | `{}` | `{providerID: baseURL}` for providers OpenCode's config does not expose. |
 | `judgeExtra` | thinking off | Merged into the judge request body. |
-| `judgeSystem`, `judgeQuestion` | see `dredd.example.json` | The judge prompt. |
-| `isoblock` | off | Tool policy, below. |
+| `judgeSystem`, `judgeQuestion` | see `stayhomedad.example.json` | The judge prompt. |
+| `tools` | off | Tool policy, below. |
 
-### isoblock
+### Tool policy
 
 ```jsonc
-{ "isoblock": { "mode": "enforce", "delegateTo": "explore" } }
+{ "tools": { "mode": "enforce", "delegateTo": "explore" } }
 ```
 
 | Key | Default | Meaning |
@@ -163,7 +147,7 @@ The judged agent needs permission to call `escalateTo`:
 flowchart TD
     U(["your request"]) --> L["local agent<br/>reads, edits, runs commands<br/>every tool call stays here"]
 
-    subgraph G["dredd"]
+    subgraph G["the judge"]
         direction TB
         S["summarise the turn<br/>request, tool calls, final report"] --> J["ask the judge for one token<br/>YES or NO"] --> P["read P from that token's logprobs"]
     end
@@ -175,7 +159,7 @@ flowchart TD
     M -->|auto| H["tell the agent to hand off"]
     H --> F["planner<br/>frontier model"]
 
-    F -->|"calls read or bash"| B{{"isoblock<br/>is this model local?"}}
+    F -->|"calls read or bash"| B{{"stayhomedad<br/>is this model local?"}}
     B -->|no| R["refused: delegate to explore"]
     R --> X["explore<br/>local subagent<br/>looks it up"]
     X -->|"summary only"| F
@@ -185,7 +169,7 @@ flowchart TD
 The judge is a separate call with no history and no stake in the outcome, which
 is why its answer is worth more than the agent's own opinion of its work.
 
-1. On `session.idle`, dredd looks at the last user turn. Subagent sessions, its
+1. On `session.idle`, stayhomedad looks at the last user turn. Subagent sessions, its
    own injected messages, compaction turns, and agents outside `agents` are all
    skipped, and each turn is judged at most once.
 2. It builds a compact transcript: the request, each tool call with truncated
@@ -195,15 +179,15 @@ is why its answer is worth more than the agent's own opinion of its work.
    the yes-plus-no mass. Without them, the YES/NO text is parsed and the score
    is 0 or 1.
 4. Below `threshold`, it either posts an advisory note or instructs the agent to
-   hand off. Every verdict is appended to `~/.local/state/opencode/dredd.jsonl`.
+   hand off. Every verdict is appended to `~/.local/state/opencode/stayhomedad.jsonl`.
 
 A turn whose assistant message carries an error scores 0 without consulting the
 judge.
 
-isoblock runs on a different hook and needs no judge. It resolves the agent for
+The tool policy runs on a different hook and needs no judge. It resolves the agent for
 the session, resolves that agent's provider, and throws on a blocked tool. The
 model sees the refusal as an ordinary tool error and retries through `task`.
-Blocks are appended to the same log with `"kind":"isoblock"`.
+Blocks are appended to the same log with `"kind":"tools"`.
 
 ## Calibrate
 
@@ -234,7 +218,7 @@ of that one.
 ## Watch it
 
 ```bash
-tail -f ~/.local/state/opencode/dredd.jsonl
+tail -f ~/.local/state/opencode/stayhomedad.jsonl
 ```
 
 Each line records the score, the method (`logprobs` or `text`), the judge

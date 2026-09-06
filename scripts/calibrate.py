@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Score past judged-agent turns with the dredd judge to pick a threshold.
+"""Score past judged-agent turns with the stayhomedad judge to pick a threshold.
 
 Reads ~/.local/share/opencode/opencode.db read-only, rebuilds the same turn
 summary the plugin builds, calls the judge, prints one row per turn sorted by
 P(yes). Usage: scripts/calibrate.py [--limit N] [--url URL --model M] [--threshold T]
 Judge target per turn: the provider the turn ran on (opencode.json baseURL, then
-providerUrls in ~/.config/opencode/dredd.json), unless --url overrides.
+providerUrls in ~/.config/opencode/stayhomedad.json), unless --url overrides.
 """
 # ponytail: labels are eyeballed from the FINAL column; add a --label pass via
 # the frontier only if live JSONL shows the threshold is unstable.
@@ -13,7 +13,7 @@ import argparse, json, math, os, re, sqlite3, sys, urllib.request
 
 DB = os.path.expanduser("~/.local/share/opencode/opencode.db")
 CFG_DIR = os.path.join(os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config"), "opencode")
-CFG_PATH = os.path.join(CFG_DIR, "dredd.json")
+CFG_PATH = os.path.join(CFG_DIR, "stayhomedad.json")
 CFG = {"threshold": 0.45, "agents": ["local"], "judgeUrl": None, "judgeModel": None, "providerUrls": {},
        "judgeExtra": {"chat_template_kwargs": {"enable_thinking": False}},
        "judgeSystem": "Reply YES or NO.", "judgeQuestion": "Adequate? Answer YES or NO."}

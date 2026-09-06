@@ -1,13 +1,19 @@
-// dredd — Doubt-Rated Escalation for Delegated Development.
-// After each judged agent turn, a fresh-context judge call scores P(YES) that
-// the turn actually handled the request. Below threshold it either posts an
-// advisory note or tells the agent to hand off to a stronger subagent.
-import { loadConfig, summarizeTurn, judge, log, verdictText, resolveJudge, SENTINEL } from "./dredd.js"
-import { ISOBLOCK_DEFAULTS, isoVerdict } from "./isoblock.js"
+// stayhomedad — the local model does the job itself and calls a professional
+// only when it is out of its depth.
+//
+// Two hooks. After each judged turn a fresh-context judge call scores P(YES)
+// that the turn actually handled the request; below threshold it posts an
+// advisory note or tells the agent to hand off. And an agent on a metered
+// remote model is refused the repo tools, so it has to delegate and read a
+// summary instead of the raw material.
+import {
+  loadConfig, summarizeTurn, judge, log, verdictText, resolveJudge, SENTINEL,
+  TOOLS_DEFAULTS, toolVerdict,
+} from "./stayhomedad.js"
 
-export default async function Dredd({ client }, options = {}) {
+export default async function StayHomeDad({ client }, options = {}) {
   const cfg = loadConfig(options)
-  const iso = { ...ISOBLOCK_DEFAULTS, ...(cfg.isoblock ?? {}) }
+  const tools = { ...TOOLS_DEFAULTS, ...(cfg.tools ?? {}) }
   const judged = new Map() // sessionID -> last judged userMessageID
   const count = new Map() // sessionID -> escalations so far
   const agentOf = new Map() // sessionID -> agent name
@@ -153,13 +159,13 @@ export default async function Dredd({ client }, options = {}) {
         if (sessionID && sub) agentOf.set(sessionID, sub)
         return
       }
-      if (iso.mode === "off" || !sessionID) return
+      if (tools.mode === "off" || !sessionID) return
       const agent = await agentForSession(sessionID)
       const providerID = await providerOfAgent(agent)
-      const refusal = isoVerdict({ tool, agent, providerID }, iso, await providerConfig())
+      const refusal = toolVerdict({ tool, agent, providerID }, tools, await providerConfig())
       if (!refusal) return
-      log({ kind: "isoblock", sessionID, agent, provider: providerID, tool, action: iso.mode }, cfg.logPath)
-      if (iso.mode === "enforce") throw new Error(refusal)
+      log({ kind: "tools", sessionID, agent, provider: providerID, tool, action: tools.mode }, cfg.logPath)
+      if (tools.mode === "enforce") throw new Error(refusal)
     },
 
     event: async ({ event }) => {

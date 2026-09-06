@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test"
-import { ISOBLOCK_DEFAULTS, isLocalHost, isLocalProvider, isoVerdict } from "../src/isoblock.js"
+import { TOOLS_DEFAULTS, isLocalHost, isLocalProvider, toolVerdict } from "../src/stayhomedad.js"
 
-const cfg = { ...ISOBLOCK_DEFAULTS, mode: "enforce" }
+const cfg = { ...TOOLS_DEFAULTS, mode: "enforce" }
 const providers = { llamacpp: { options: { baseURL: "http://127.0.0.1:11435/v1" } } }
 
 test("loopback and LAN hosts are local, public ones are not", () => {
@@ -21,27 +21,27 @@ test("provider classification: config baseURL, name list, explicit remote", () =
 
 test("local agents keep every tool", () => {
   for (const tool of ["read", "edit", "bash", "grep", "write", "apply_patch"])
-    expect(isoVerdict({ tool, agent: "local", providerID: "llamacpp" }, cfg, providers)).toBe(null)
+    expect(toolVerdict({ tool, agent: "local", providerID: "llamacpp" }, cfg, providers)).toBe(null)
 })
 
 test("remote agents lose repo tools but keep task, question and unknown tools", () => {
-  const blocked = isoVerdict({ tool: "read", agent: "planner", providerID: "github-copilot" }, cfg, providers)
+  const blocked = toolVerdict({ tool: "read", agent: "planner", providerID: "github-copilot" }, cfg, providers)
   expect(blocked).toContain("explore")
   expect(blocked).toContain("planner")
   for (const tool of cfg.block)
-    expect(isoVerdict({ tool, agent: "planner", providerID: "github-copilot" }, cfg, providers)).toContain("isoblock")
+    expect(toolVerdict({ tool, agent: "planner", providerID: "github-copilot" }, cfg, providers)).toContain("stayhomedad")
   // asking the user, delegating, and anything OpenCode adds later stay open
   for (const tool of ["task", "question", "todowrite", "skill", "invalid", "some_future_tool"])
-    expect(isoVerdict({ tool, agent: "planner", providerID: "github-copilot" }, cfg, providers)).toBe(null)
+    expect(toolVerdict({ tool, agent: "planner", providerID: "github-copilot" }, cfg, providers)).toBe(null)
 })
 
 test("fails open: unknown provider and mode off never block", () => {
-  expect(isoVerdict({ tool: "read", agent: "mystery", providerID: null }, cfg, providers)).toBe(null)
-  expect(isoVerdict({ tool: "read", agent: "planner", providerID: "github-copilot" }, ISOBLOCK_DEFAULTS, providers)).toBe(null)
+  expect(toolVerdict({ tool: "read", agent: "mystery", providerID: null }, cfg, providers)).toBe(null)
+  expect(toolVerdict({ tool: "read", agent: "planner", providerID: "github-copilot" }, TOOLS_DEFAULTS, providers)).toBe(null)
 })
 
 test("exempt list wins over the provider check", () => {
   const c = { ...cfg, exempt: ["reviewer"] }
-  expect(isoVerdict({ tool: "read", agent: "reviewer", providerID: "github-copilot" }, c, providers)).toBe(null)
-  expect(isoVerdict({ tool: "read", agent: "planner", providerID: "github-copilot" }, c, providers)).toContain("isoblock")
+  expect(toolVerdict({ tool: "read", agent: "reviewer", providerID: "github-copilot" }, c, providers)).toBe(null)
+  expect(toolVerdict({ tool: "read", agent: "planner", providerID: "github-copilot" }, c, providers)).toContain("stayhomedad")
 })

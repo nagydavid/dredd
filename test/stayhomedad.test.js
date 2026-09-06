@@ -9,7 +9,7 @@ import {
   resolveJudge,
   configDir,
   SENTINEL,
-} from "../src/dredd.js"
+} from "../src/stayhomedad.js"
 
 // Recorded from llama.cpp (Qwen3.8-27B UD-Q4_K_XL) on 2026-09-06.
 const PROBE = [
