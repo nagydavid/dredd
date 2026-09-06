@@ -4,3 +4,4 @@ bun.lockb
 package-lock.json
 *.jsonl
 *.bak
+scripts/__pycache__/
