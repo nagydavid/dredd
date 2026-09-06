@@ -3,24 +3,69 @@
 // the turn actually handled the request. Below threshold it either posts an
 // advisory note or tells the agent to hand off to a stronger subagent.
 import { loadConfig, summarizeTurn, judge, log, verdictText, resolveJudge, SENTINEL } from "./dredd.js"
+import { ISOBLOCK_DEFAULTS, isoVerdict } from "./isoblock.js"
 
 export default async function Dredd({ client }, options = {}) {
   const cfg = loadConfig(options)
+  const iso = { ...ISOBLOCK_DEFAULTS, ...(cfg.isoblock ?? {}) }
   const judged = new Map() // sessionID -> last judged userMessageID
   const count = new Map() // sessionID -> escalations so far
+  const agentOf = new Map() // sessionID -> agent name
 
   // No client calls during init: plugin load runs before the server accepts
   // requests, so awaiting the server's own API here deadlocks startup.
-  let providers = null
-  async function providerConfig() {
-    if (providers) return providers
+  let conf = null
+  async function appConfig() {
+    if (conf) return conf
     try {
       const { data } = await client.config.get()
-      providers = data?.provider ?? {}
+      conf = data ?? {}
     } catch {
-      providers = {}
+      conf = {}
     }
-    return providers
+    return conf
+  }
+  const providerConfig = async () => (await appConfig()).provider ?? {}
+
+  // agent name -> providerID. Agents with no model of their own inherit the
+  // top-level one, which is what OpenCode reports as null here.
+  let agentProvider = null
+  async function providerOfAgent(name) {
+    if (!name) return null
+    if (!agentProvider) {
+      agentProvider = new Map()
+      try {
+        const { data = [] } = await client.app.agents()
+        for (const a of data) agentProvider.set(a.name, a.model?.providerID ?? null)
+      } catch {
+        /* fall through to the default model below */
+      }
+    }
+    const own = agentProvider.get(name)
+    if (own) return own
+    const fallback = (await appConfig()).model
+    return typeof fallback === "string" ? fallback.split("/")[0] : null
+  }
+
+  // Agent for a session. Primary sessions are recorded by chat.message, child
+  // sessions by the task call that spawned them; this is the last resort.
+  async function agentForSession(sessionID) {
+    if (agentOf.has(sessionID)) return agentOf.get(sessionID)
+    let name = null
+    try {
+      const { data: messages = [] } = await client.session.messages({ path: { id: sessionID } })
+      for (let i = messages.length - 1; i >= 0; i--) {
+        const info = messages[i].info
+        if (info?.role === "user" && info.agent) {
+          name = info.agent
+          break
+        }
+      }
+    } catch {
+      /* unknown agent means no block */
+    }
+    agentOf.set(sessionID, name)
+    return name
   }
 
   async function tryCase(sessionID) {
@@ -92,10 +137,31 @@ export default async function Dredd({ client }, options = {}) {
         })
       }
     }
-    log({ ...base, judgeUrl: target.url, judgeModel: target.model, pYes, method, action, reason, judgeMs }, cfg.logPath)
+    log({ kind: "verdict", ...base, judgeUrl: target.url, judgeModel: target.model, pYes, method, action, reason, judgeMs }, cfg.logPath)
   }
 
   return {
+    "chat.message": async (input) => {
+      if (input?.sessionID && input.agent) agentOf.set(input.sessionID, input.agent)
+    },
+
+    "tool.execute.before": async ({ tool, sessionID }, output) => {
+      // The task tool fires this against the *child* session it just created,
+      // so this is where a subagent session learns which agent it is running.
+      if (tool === "task") {
+        const sub = output?.args?.subagent_type
+        if (sessionID && sub) agentOf.set(sessionID, sub)
+        return
+      }
+      if (iso.mode === "off" || !sessionID) return
+      const agent = await agentForSession(sessionID)
+      const providerID = await providerOfAgent(agent)
+      const refusal = isoVerdict({ tool, agent, providerID }, iso, await providerConfig())
+      if (!refusal) return
+      log({ kind: "isoblock", sessionID, agent, provider: providerID, tool, action: iso.mode }, cfg.logPath)
+      if (iso.mode === "enforce") throw new Error(refusal)
+    },
+
     event: async ({ event }) => {
       const p = event.properties ?? {}
       const idle = event.type === "session.idle" || (event.type === "session.status" && p.status?.type === "idle")

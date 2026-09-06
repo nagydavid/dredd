@@ -38,12 +38,17 @@
 
 **D**oubt-**R**ated **E**scalation for **D**elegated **D**evelopment.
 
-An [OpenCode](https://opencode.ai) plugin. Your local model does the work. After
-every turn, dredd asks a judge one question, gets one token back, and reads the
-answer's probability. When the local model is floundering, dredd escalates to a
-stronger agent. When it isn't, dredd says nothing.
+An [OpenCode](https://opencode.ai) plugin in two halves, both aimed at the same
+thing: your frontier model should pay for conclusions, not for raw material.
 
-## Why
+- **dredd** scores every local turn with a one-token judge call and escalates
+  only the ones that went badly.
+- **isoblock** stops an agent on a metered model from calling repo tools at
+  all. It has to delegate to a local subagent and work from what comes back.
+
+Either half works on its own. isoblock is off until you turn it on.
+
+## Why dredd
 
 The usual way to make a local agent escalate is to write a rule in its prompt:
 *"hand off when the task touches three or more files, or after two failed
@@ -59,6 +64,24 @@ a usable probability rather than a coin flip. That number is the gate.
 
 This is the confidence-cascade pattern: run the cheap model first, score the
 result, escalate only on low confidence.
+
+## Why isoblock
+
+Per-agent `permission` blocks in `opencode.json` already deny tools by agent
+name. Two things go wrong with that. You have to remember to write the block
+for every agent you add, and a frontier agent that *is* allowed to read will
+read twenty files rather than ask for the one line it needs.
+
+isoblock states the rule once, by provider: an agent whose model is not served
+locally does not get `read`, `bash`, `grep`, `glob`, `edit`, `write` or
+`apply_patch`. The refusal names the subagent to delegate to, so the model
+recovers by itself on the next tool call rather than giving up. Everything else
+stays open, including `task` and `question`, so the agent can still delegate
+and still ask you something.
+
+Local means a loopback or private-network `baseURL` in your OpenCode provider
+config, plus the usual local provider names. When the provider cannot be
+resolved at all, nothing is blocked.
 
 ## Install
 
@@ -99,6 +122,32 @@ defaults. Restart OpenCode after changing either.
 | `providerUrls` | `{}` | `{providerID: baseURL}` for providers OpenCode's config does not expose. |
 | `judgeExtra` | thinking off | Merged into the judge request body. |
 | `judgeSystem`, `judgeQuestion` | see `dredd.example.json` | The judge prompt. |
+| `isoblock` | off | Tool policy, below. |
+
+### isoblock
+
+```jsonc
+{ "isoblock": { "mode": "enforce", "delegateTo": "explore" } }
+```
+
+| Key | Default | Meaning |
+|---|---|---|
+| `mode` | `"off"` | `enforce` refuses the call, `warn` only logs, `off` does nothing. |
+| `block` | the seven repo tools | Tool ids a remote agent may not call. |
+| `delegateTo` | `"explore"` | Subagent named in the refusal. |
+| `local` | common local provider ids | Extra providers to treat as local. |
+| `remote` | `[]` | Providers always treated as remote, whatever their URL. |
+| `exempt` | `[]` | Agent names that keep their tools anyway. |
+
+The blocked agents need a way out, so give them the subagent and a local
+subagent that can actually look things up:
+
+```jsonc
+"agent": {
+  "planner":  { "permission": { "task": { "*": "deny", "explore": "allow" } } },
+  "reviewer": { "permission": { "task": { "*": "deny", "explore": "allow" } } }
+}
+```
 
 The judged agent needs permission to call `escalateTo`:
 
@@ -124,7 +173,13 @@ flowchart TD
     P -->|"P below threshold"| M{mode}
     M -->|advisory| A(["post a note<br/>you decide"])
     M -->|auto| H["tell the agent to hand off"]
-    H --> F(["planner<br/>frontier model<br/>gets the summary, not the transcript"])
+    H --> F["planner<br/>frontier model"]
+
+    F -->|"calls read or bash"| B{{"isoblock<br/>is this model local?"}}
+    B -->|no| R["refused: delegate to explore"]
+    R --> X["explore<br/>local subagent<br/>looks it up"]
+    X -->|"summary only"| F
+    F --> D(["plan"])
 ```
 
 The judge is a separate call with no history and no stake in the outcome, which
@@ -144,6 +199,11 @@ is why its answer is worth more than the agent's own opinion of its work.
 
 A turn whose assistant message carries an error scores 0 without consulting the
 judge.
+
+isoblock runs on a different hook and needs no judge. It resolves the agent for
+the session, resolves that agent's provider, and throws on a blocked tool. The
+model sees the refusal as an ordinary tool error and retries through `task`.
+Blocks are appended to the same log with `"kind":"isoblock"`.
 
 ## Calibrate
 
