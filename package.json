@@ -1,0 +1,28 @@
+{
+  "name": "opencode-dredd",
+  "version": "0.1.0",
+  "description": "Doubt-Rated Escalation for Delegated Development — an OpenCode plugin that scores every local-model turn and escalates to a stronger agent when the local one is floundering.",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./core": "./src/dredd.js"
+  },
+  "files": ["index.js", "src", "dredd.example.json", "README.md", "LICENSE"],
+  "scripts": {
+    "test": "bun test test/"
+  },
+  "keywords": ["opencode", "opencode-plugin", "llm", "local-llm", "llama.cpp", "ollama", "vllm", "model-routing", "escalation", "agents"],
+  "license": "MIT",
+  "engines": {
+    "bun": ">=1.0.0"
+  },
+  "peerDependencies": {
+    "@opencode-ai/plugin": ">=1.18.0"
+  },
+  "peerDependenciesMeta": {
+    "@opencode-ai/plugin": {
+      "optional": true
+    }
+  }
+}

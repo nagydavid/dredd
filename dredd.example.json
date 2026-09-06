@@ -1,0 +1,16 @@
+{
+  "threshold": 0.45,
+  "mode": "advisory",
+  "maxPerSession": 3,
+  "agents": ["local"],
+  "escalateTo": "planner",
+  "judgeUrl": null,
+  "judgeModel": null,
+  "providerUrls": {
+    "ollama": "http://127.0.0.1:11434/v1",
+    "lmstudio": "http://127.0.0.1:1234/v1"
+  },
+  "judgeExtra": { "chat_template_kwargs": { "enable_thinking": false } },
+  "judgeSystem": "You review the final turn of a coding agent. Reply with exactly one word, YES or NO. YES: the response adequately handles the request. That includes a correct answer to a question, a completed task, or correctly stopping to ask a necessary clarification. NO: the agent failed, got stuck, gave up, hit errors it did not resolve, or left the task incomplete.",
+  "judgeQuestion": "Does this response adequately handle the request? Answer YES or NO."
+}
