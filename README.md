@@ -1,13 +1,28 @@
 # dredd
 
+```
+             ▄▄████████████▄▄
+          ▄████████████████████▄
+        ▄████████████████████████▄
+       ██████████████████████████████
+      ████████████████████████████████
+      ████▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄████
+      ███                          ███
+      ████▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀████
+       ██████████████████████████████
+        ▀████████████████████████▀
+          ▀▀████████████████▀▀
+             ▀▀▀▀████████▀▀▀▀
+
+          I  A M  T H E  L A W
+```
+
 **D**oubt-**R**ated **E**scalation for **D**elegated **D**evelopment.
 
 An [OpenCode](https://opencode.ai) plugin. Your local model does the work. After
 every turn, dredd asks a judge one question, gets one token back, and reads the
 answer's probability. When the local model is floundering, dredd escalates to a
 stronger agent. When it isn't, dredd says nothing.
-
-> I AM THE LAW.
 
 ## Why
 
@@ -76,6 +91,26 @@ The judged agent needs permission to call `escalateTo`:
 
 ## How it works
 
+```mermaid
+flowchart TD
+    U(["your request"]) --> L["local agent<br/>reads, edits, runs commands<br/>every tool call stays here"]
+
+    subgraph G["dredd"]
+        direction TB
+        S["summarise the turn<br/>request, tool calls, final report"] --> J["ask the judge for one token<br/>YES or NO"] --> P["read P from that token's logprobs"]
+    end
+
+    L -->|turn ends| S
+    P -->|"P above threshold"| Q(["say nothing"])
+    P -->|"P below threshold"| M{mode}
+    M -->|advisory| A(["post a note<br/>you decide"])
+    M -->|auto| H["tell the agent to hand off"]
+    H --> F(["planner<br/>frontier model<br/>gets the summary, not the transcript"])
+```
+
+The judge is a separate call with no history and no stake in the outcome, which
+is why its answer is worth more than the agent's own opinion of its work.
+
 1. On `session.idle`, dredd looks at the last user turn. Subagent sessions, its
    own injected messages, compaction turns, and agents outside `agents` are all
    skipped, and each turn is judged at most once.
@@ -102,9 +137,20 @@ python3 scripts/calibrate.py --url http://127.0.0.1:11435/v1 --limit 20
 ```
 
 It prints one row per turn sorted by score, so you can see where the gap between
-good turns and stuck ones falls. On the author's history that gap was wide:
-stuck or blocked turns scored at or below 0.07, and turns that answered the
-question scored at or above 0.61. Hence a default of 0.45.
+good turns and stuck ones falls. On the author's history that gap was wide, and
+nothing at all landed in the middle:
+
+```
+  0.0                     0.45                      1.0
+   ├───────────────────────┼────────────────────────┤
+   ●●●●●●●●                │                 ●●●●●●●●
+   │                       │                        │
+   └ stuck, blocked,   threshold      answered it, ─┘
+     gave up: ≤ 0.07                  finished it: ≥ 0.61
+```
+
+Pick your threshold inside your own gap. The default of 0.45 sits in the middle
+of that one.
 
 ## Watch it
 
